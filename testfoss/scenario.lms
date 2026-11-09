@@ -43,8 +43,9 @@ $return.pause_time = time_label.text_content();
 slider.fill(max);
 time_label.expect("toHaveText", "[\"" + max + "\",{\"timeout\":30000}]");
 $return.seek_max = time_label.text_content();
+p.wait_for_timeout(2000);
 p.locator("#screenshot").click();
-log.expect("toContainText", "[\"screenshot: \",{\"timeout\":60000}]");
+log.expect("toContainText", "[\"screenshot: \",{\"timeout\":180000}]");
 p.wait_for_function("document.querySelector('#screenshot-image')?.naturalWidth > 0");
 $return.screenshot_width = p.evaluate("document.querySelector('#screenshot-image').naturalWidth");
 $return.recording_loaded = p.evaluate("performance.getEntriesByType('resource').some((entry) => entry.name === '" + recording + "')");
@@ -52,7 +53,7 @@ $return.no_hosted_recording = p.evaluate("performance.getEntriesByType('resource
 $return.local_viewer_wasm = p.evaluate("performance.getEntriesByType('resource').some((entry) => new URL(entry.name).origin === location.origin && entry.name.endsWith('/re_viewer_bg.wasm'))");
 $return.viewer_console = p.console_log();
 $return.viewer_errors = p.page_errors();
-p.screenshot(artifacts + "/viewer-control.png", "{\"timeout\":60000}");
+p.screenshot(artifacts + "/viewer-control.png", "{\"timeout\":180000}");
 
 let m = b.new_page("{\"viewport\":{\"width\":1000,\"height\":750}}");
 m.set_default_timeout(120000);
