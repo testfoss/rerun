@@ -1,0 +1,114 @@
+# Rerun viewer-control and multiview integration through lmwebtest Playwright.
+let viewer_url = env("TESTFOSS_VIEWER_URL", "http://127.0.0.1:8102");
+let recording_url = env("TESTFOSS_RECORDING_URL", "http://127.0.0.1:8104/example.rrd");
+let multiview_url = env("TESTFOSS_MULTIVIEW_URL", "http://127.0.0.1:8103");
+
+program = _lmcode_ cli="lmwebtest playwright";
+let viewer_base = pw.env("TESTFOSS_VIEWER_URL");
+let recording = pw.env("TESTFOSS_RECORDING_URL");
+let multiview = pw.env("TESTFOSS_MULTIVIEW_URL");
+let artifacts = pw.env("TESTFOSS_ARTIFACTS");
+let chrome = pw.env("CHROME");
+let launch_options = "{\"headless\":true,\"args\":[\"--use-angle=swiftshader\",\"--enable-unsafe-swiftshader\",\"--disable-features=WebGPU\"]}";
+if (chrome != "") {
+  launch_options = "{\"headless\":true,\"executablePath\":\"" + chrome + "\",\"args\":[\"--use-angle=swiftshader\",\"--enable-unsafe-swiftshader\",\"--disable-features=WebGPU\"]}";
+}
+let b = pw.launch("chromium", launch_options);
+
+let p = b.new_page("{\"viewport\":{\"width\":1600,\"height\":1100}}");
+p.set_default_timeout(120000);
+p.set_default_navigation_timeout(120000);
+p.add_init_script("Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });");
+p.goto(viewer_base + "/?url=" + recording + "&renderer=webgl", "{\"waitUntil\":\"domcontentloaded\",\"timeout\":120000}");
+let play = p.locator("#play");
+let slider = p.locator("#time");
+let time_label = p.locator("#time-label");
+let log = p.locator("#log");
+slider.wait_for("visible", 120000);
+slider.expect("toBeEnabled", "{\"timeout\":180000}");
+log.expect("toContainText", "[\"recording_open\",{\"timeout\":30000}]");
+play.expect("toHaveText", "[\"Play\",{\"timeout\":60000}]");
+let min = slider.get_attribute("min");
+let max = slider.get_attribute("max");
+slider.fill(min);
+time_label.expect("toHaveText", "[\"" + min + "\",{\"timeout\":30000}]");
+$return.seek_min = time_label.text_content();
+play.click();
+play.expect("toHaveText", "[\"Pause\",{\"timeout\":30000}]");
+p.wait_for_timeout(500);
+$return.playing_time = time_label.text_content();
+play.click();
+play.expect("toHaveText", "[\"Play\",{\"timeout\":30000}]");
+$return.pause_time = time_label.text_content();
+slider.fill(max);
+time_label.expect("toHaveText", "[\"" + max + "\",{\"timeout\":30000}]");
+$return.seek_max = time_label.text_content();
+p.locator("#screenshot").click();
+log.expect("toContainText", "[\"screenshot: \",{\"timeout\":60000}]");
+p.wait_for_function("document.querySelector('#screenshot-image')?.naturalWidth > 0");
+$return.screenshot_width = p.evaluate("document.querySelector('#screenshot-image').naturalWidth");
+$return.recording_loaded = p.evaluate("performance.getEntriesByType('resource').some((entry) => entry.name === '" + recording + "')");
+$return.no_hosted_recording = p.evaluate("performance.getEntriesByType('resource').every((entry) => !entry.name.startsWith('https://app.rerun.io'))");
+$return.local_viewer_wasm = p.evaluate("performance.getEntriesByType('resource').some((entry) => new URL(entry.name).origin === location.origin && entry.name.endsWith('/re_viewer_bg.wasm'))");
+$return.viewer_console = p.console_log();
+$return.viewer_errors = p.page_errors();
+p.screenshot(artifacts + "/viewer-control.png", "{\"timeout\":60000}");
+
+let m = b.new_page("{\"viewport\":{\"width\":1000,\"height\":750}}");
+m.set_default_timeout(120000);
+m.set_default_navigation_timeout(120000);
+m.add_init_script("Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });");
+m.goto(multiview, "{\"waitUntil\":\"load\",\"timeout\":120000}");
+let canvas = m.locator("canvas");
+canvas.wait_for("visible", 120000);
+m.wait_for_timeout(5000);
+$return.multiview_title = m.title();
+$return.multiview_canvases = canvas.count();
+$return.local_multiview_wasm = m.evaluate("performance.getEntriesByType('resource').some((entry) => new URL(entry.name).origin === location.origin && entry.name.endsWith('/multiview_bg.wasm'))");
+$return.multiview_console = m.console_log();
+$return.multiview_errors = m.page_errors();
+b.close();
+end _lmcode_
+
+let res = run_lmcode(program, {command: ["lmwebtest", "playwright", "--lmcode", "$DSLFILE"]});
+let stats = {pass: 0, fail: 0};
+fn check(condition, name, detail) {
+  if (condition) {
+    stats["pass"] = stats.get("pass", 0) + 1;
+    println(f"[PASS] {name}: {detail}");
+  } else {
+    stats["fail"] = stats.get("fail", 0) + 1;
+    println(f"[FAIL] {name}: {detail}");
+  }
+}
+
+check(res.get("ok", false), "lmwebtest run", "Playwright scenario completed");
+if (!res.get("ok", false)) {
+  println(json_stringify(res));
+  exit(1);
+}
+let r = res.get("result", {});
+check(r.get("recording_loaded", "") == "true", "local recording URL", recording_url);
+check(r.get("no_hosted_recording", "") == "true", "no hosted recording request", "app.rerun.io was not used");
+check(r.get("local_viewer_wasm", "") == "true", "local viewer Wasm", "loaded from the Vite origin");
+check(r.get("seek_min", "") != "" && r.get("playing_time", "") != r.get("seek_min", ""), "play advances time", r.get("playing_time", ""));
+check(r.get("pause_time", "") != "", "pause control", r.get("pause_time", ""));
+check(r.get("seek_max", "") != "" && r.get("seek_max", "") != r.get("seek_min", ""), "seek controls", r.get("seek_min", "") + " to " + r.get("seek_max", ""));
+check(num(r.get("screenshot_width", "0")) > 0, "viewer screenshot API", r.get("screenshot_width", ""));
+check(contains(r.get("viewer_console", ""), "WebGL") || contains(r.get("viewer_console", ""), "backend: Gl"), "viewer WebGL backend", "SwiftShader WebGL selected");
+check(r.get("viewer_errors", "") == "[]", "viewer page errors", r.get("viewer_errors", ""));
+check(r.get("multiview_title", "") == "multiview", "multiview document", r.get("multiview_title", ""));
+check(r.get("multiview_canvases", 0) == 1, "multiview rendered canvas", str(r.get("multiview_canvases", 0)));
+check(r.get("local_multiview_wasm", "") == "true", "local multiview Wasm", "loaded from the static origin");
+check(contains(r.get("multiview_console", ""), "WebGL") || contains(r.get("multiview_console", ""), "backend: Gl"), "multiview WebGL backend", "SwiftShader WebGL selected");
+let unexpected = 0;
+for (message in json_parse(r.get("multiview_errors", "[]"))) {
+  if (!contains(message, "Using exceptions for control flow")) {
+    unexpected = unexpected + 1;
+  }
+}
+check(unexpected == 0, "multiview page errors", r.get("multiview_errors", "[]"));
+println(f"Rerun integration: {str(stats.get('pass', 0))} passed, {str(stats.get('fail', 0))} failed");
+if (stats.get("fail", 0) > 0) {
+  exit(1);
+}

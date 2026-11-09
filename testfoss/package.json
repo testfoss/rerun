@@ -1,0 +1,12 @@
+{
+  "name": "testfoss-rerun-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "bash run.sh --check",
+    "test": "bash run.sh --browser-only"
+  },
+  "dependencies": {
+    "lmwebtest": "github:lmctl-ai/lmwebtest#2920befd355eacc654697820d690db074e94dce3"
+  }
+}

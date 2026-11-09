@@ -204,3 +204,10 @@ facilitates the tool's discovery by other researchers.
 1. Download the correct `.whl` from [GitHub Releases](https://github.com/rerun-io/rerun/releases)
 2. Run `pip install rerun_sdk<…>.whl` (replace `<…>` with the actual filename)
 3. Test it: `rerun --version`
+
+## Testfoss demo
+
+The additive `testfoss-demo` branch builds the official web viewer and multiview example, then checks local recording playback, play/pause/seek, and WebGL rendering through `lmwebtest playwright`.
+The upstream `viewer_control` source remains pristine and selects the recording with its existing URL query parameter.
+See [the demo guide](testfoss/README.md) for prerequisites and `./testfoss/run.sh`, or inspect `.github/workflows/testfoss.yml`.
+No upstream source, example, lockfile, or existing workflow is modified.

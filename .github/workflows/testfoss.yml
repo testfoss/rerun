@@ -1,0 +1,56 @@
+name: Testfoss demo
+
+on:
+  push:
+    branches: [testfoss-demo]
+  pull_request:
+    branches: [testfoss-demo]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testfoss-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out the fork and pinned upstream history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up the lab-proven Node version
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.20.0
+
+      - name: Set up Pixi
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.82.1
+
+      - name: Install LMScript
+        run: npm install --global @lmctl-ai/lmctl@0.2.463
+
+      - name: Install the pinned lmwebtest host
+        run: npm ci --prefix testfoss
+
+      - name: Install Chromium and its Linux dependencies
+        run: npm exec --prefix testfoss -- playwright install --with-deps chromium
+
+      - name: Materialize only the two required pinned LFS fixtures
+        run: |
+          git lfs install --local
+          git lfs pull --include="examples/assets/example.rrd,tests/assets/rerun.obj"
+
+      - name: Build, run the official smoke test, and exercise both browser demos
+        run: ./testfoss/run.sh
+        env:
+          CI: "true"
+          CARGO_BUILD_JOBS: "2"
