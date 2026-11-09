@@ -113,11 +113,11 @@ if [[ "$MODE" != "--browser-only" ]]; then
         exit 1
     }
     export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}"
-    pixi --manifest-path "$ROOT/pixi.toml" run check-env
-    pixi --manifest-path "$ROOT/pixi.toml" run rerun-build-web
-    pixi --manifest-path "$ROOT/pixi.toml" run re-renderer-web-example multiview --build-only
-    pixi --manifest-path "$ROOT/pixi.toml" run js-build-base-debug
-    CHROME="$CHROME_PATH" pixi --manifest-path "$ROOT/pixi.toml" run js-example-viewer-control-test
+    pixi run --manifest-path "$ROOT/pixi.toml" check-env
+    pixi run --manifest-path "$ROOT/pixi.toml" rerun-build-web
+    pixi run --manifest-path "$ROOT/pixi.toml" re-renderer-web-example multiview --build-only
+    pixi run --manifest-path "$ROOT/pixi.toml" js-build-base-debug
+    CHROME="$CHROME_PATH" pixi run --manifest-path "$ROOT/pixi.toml" js-example-viewer-control-test
 fi
 
 MULTIVIEW_DIST="$ROOT/target/wasm/re_renderer_examples/multiview"
