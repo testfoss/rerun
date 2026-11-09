@@ -45,4 +45,4 @@ The viewer may still make its optional GitHub latest-release request, but record
 Multiview PNG capture timed out once under SwiftShader, matching a lab-observed limitation, so the scenario asserts the rendered canvas, local Wasm, WebGL backend, and page errors without requiring that capture.
 The expensive build was not repeated while authoring this additive content.
 The new scenario passed all 15 lmwebtest checks against the existing lab-built upstream servers and a loopback recording server with `/usr/bin/google-chrome`; the viewer screenshot visually confirmed the local DNA recording.
-Fresh-install schema discovery and syntax checks also passed, while the full source build and Actions run remain CI validation.
+Fresh-install schema discovery and syntax checks also passed. GitHub Actions run 42673771844 then passed the full source build, official viewer-control smoke test, and all 15 lmwebtest checks with the same recording-origin and event-synchronization contract.
