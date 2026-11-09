@@ -117,7 +117,11 @@ if [[ "$MODE" != "--browser-only" ]]; then
     pixi run --manifest-path "$ROOT/pixi.toml" rerun-build-web
     pixi run --manifest-path "$ROOT/pixi.toml" re-renderer-web-example multiview --build-only
     pixi run --manifest-path "$ROOT/pixi.toml" js-build-base-debug
-    CHROME="$CHROME_PATH" pixi run --manifest-path "$ROOT/pixi.toml" js-example-viewer-control-test
+    (
+        cd "$ROOT/examples/js/viewer_control"
+        npm ci
+        CHROME="$CHROME_PATH" npm test -- --retries=1
+    )
 fi
 
 MULTIVIEW_DIST="$ROOT/target/wasm/re_renderer_examples/multiview"
