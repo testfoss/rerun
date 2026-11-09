@@ -30,15 +30,15 @@ CI materializes only those two LFS fixtures and never commits their materializat
 
 ## Fork workflow
 
-`testfoss/run.sh` reproduces the source builds and official smoke test, starts the Vite and static servers, and runs `testfoss/scenario.lms` through `lmwebtest playwright`.
-The recording comes from a separate loopback server selected with `?url=`, so no upstream TypeScript change or binary Playwright route is needed.
+`testfoss/run.sh` reproduces the source builds and official smoke test, starts Vite, multiview, and a same-origin recording proxy, and runs `testfoss/scenario.lms` through `lmwebtest playwright`.
+The proxy serves the hash-checked fixture at `/example.rrd` and forwards every other request to Vite, matching the official smoke test without an upstream TypeScript change.
 The workflow uses read-only repository permission and SHA-pinned actions, with no deployment or secrets.
 Exact local commands and browser-only reuse are documented in `testfoss/README.md`.
 
 ## Limitations
 
 Primary WebGPU failed in the lab on SwiftShader with a `GPUDevice.createBuffer` error for both viewer and multiview.
-WebGL 2 through SwiftShader passed, so the fork scenario explicitly disables WebGPU and does not claim native GPU or WebGPU support.
+The viewer follows the official default renderer; `TESTFOSS_DISABLE_WEBGPU=1` is an explicit fallback, and multiview forces WebGL. No native-GPU or WebGPU support is claimed. Playback waits for play/pause event completion before capture, matching the official smoke test's synchronization and 1280×720 viewport.
 The lab observed winit's intentional `Using exceptions for control flow` page error in multiview; only that exact known message is tolerated by the new smoke check.
 The full debug source build is tested, not a release build.
 The viewer may still make its optional GitHub latest-release request, but recording playback does not use `app.rerun.io`.

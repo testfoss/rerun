@@ -139,13 +139,15 @@ mkdir -p "$ARTIFACTS"
 SERVER_PIDS+=("$!")
 node "$HERE/static-server.mjs" "$MULTIVIEW_DIST" "$MULTIVIEW_PORT" >"$ARTIFACTS/multiview-server.log" 2>&1 &
 SERVER_PIDS+=("$!")
-node "$HERE/static-server.mjs" "$ROOT/examples/assets" "$RECORDING_PORT" >"$ARTIFACTS/recording-server.log" 2>&1 &
+TESTFOSS_VIEWER_TARGET="http://127.0.0.1:$VIEWER_PORT" \
+    TESTFOSS_RECORDING_FILE="$ROOT/examples/assets/example.rrd" \
+    node "$HERE/recording-proxy.mjs" "$RECORDING_PORT" >"$ARTIFACTS/recording-server.log" 2>&1 &
 SERVER_PIDS+=("$!")
 wait_ready "http://127.0.0.1:$VIEWER_PORT/"
 wait_ready "http://127.0.0.1:$MULTIVIEW_PORT/"
 wait_ready "http://127.0.0.1:$RECORDING_PORT/example.rrd"
-TESTFOSS_VIEWER_URL="http://127.0.0.1:$VIEWER_PORT" \
+TESTFOSS_VIEWER_URL="http://127.0.0.1:$RECORDING_PORT" \
     TESTFOSS_MULTIVIEW_URL="http://127.0.0.1:$MULTIVIEW_PORT" \
-    TESTFOSS_RECORDING_URL="http://127.0.0.1:$RECORDING_PORT/example.rrd" \
+    TESTFOSS_RECORDING_URL="/example.rrd" \
     TESTFOSS_ARTIFACTS="$ARTIFACTS" lmscript "$HERE/scenario.lms"
 verify_upstream

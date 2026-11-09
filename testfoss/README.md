@@ -13,10 +13,10 @@ git lfs pull --include="examples/assets/example.rrd,tests/assets/rerun.obj"
 ./testfoss/run.sh
 ```
 
-The full run executes `pixi run check-env`, `rerun-build-web`, the `multiview --build-only` build, `js-build-base-debug`, and the official `js-example-viewer-control-test` smoke test.
-It then serves the Vite viewer, multiview output, and local recording on separate loopback ports and runs `scenario.lms` via `cli="lmwebtest playwright"`.
-The scenario checks local Wasm and recording requests, play/pause, minimum and maximum seeks, the screenshot API, and a rendered multiview canvas.
-Both applications use WebGL with SwiftShader.
+The full run executes `pixi run check-env`, `rerun-build-web`, the `multiview --build-only` build, `js-build-base-debug`, and the official viewer-control smoke test with one retry for timing variance.
+It then serves Vite and multiview, with a same-origin proxy that serves the hash-checked recording at `/example.rrd` and forwards all other requests to Vite. `scenario.lms` runs via `cli="lmwebtest playwright"`.
+The scenario checks local Wasm and recording requests, play/pause event completion, minimum and maximum seeks, the screenshot API, and a rendered multiview canvas.
+The viewer uses the upstream default renderer; multiview forces WebGL with SwiftShader. Set `TESTFOSS_DISABLE_WEBGPU=1` to request the viewer's WebGL fallback on hosts that require it.
 
 For an existing build, use `./testfoss/run.sh --browser-only`.
 For syntax checks without a build, use `./testfoss/run.sh --check`.

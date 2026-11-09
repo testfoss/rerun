@@ -1,6 +1,6 @@
 # Rerun viewer-control and multiview integration through lmwebtest Playwright.
 let viewer_url = env("TESTFOSS_VIEWER_URL", "http://127.0.0.1:8102");
-let recording_url = env("TESTFOSS_RECORDING_URL", "http://127.0.0.1:8104/example.rrd");
+let recording_url = env("TESTFOSS_RECORDING_URL", "/example.rrd");
 let multiview_url = env("TESTFOSS_MULTIVIEW_URL", "http://127.0.0.1:8103");
 
 program = _lmcode_ cli="lmwebtest playwright";
@@ -9,17 +9,26 @@ let recording = pw.env("TESTFOSS_RECORDING_URL");
 let multiview = pw.env("TESTFOSS_MULTIVIEW_URL");
 let artifacts = pw.env("TESTFOSS_ARTIFACTS");
 let chrome = pw.env("CHROME");
-let launch_options = "{\"headless\":true,\"args\":[\"--use-angle=swiftshader\",\"--enable-unsafe-swiftshader\",\"--disable-features=WebGPU\"]}";
+let disable_webgpu = pw.env("TESTFOSS_DISABLE_WEBGPU") == "1";
+let webgpu_arg = "";
+let renderer_query = "";
+if (disable_webgpu) {
+  webgpu_arg = ",\"--disable-features=WebGPU\"";
+  renderer_query = "&renderer=webgl";
+}
+let launch_options = "{\"headless\":true,\"args\":[\"--use-angle=swiftshader\",\"--enable-unsafe-swiftshader\"" + webgpu_arg + "]}";
 if (chrome != "") {
-  launch_options = "{\"headless\":true,\"executablePath\":\"" + chrome + "\",\"args\":[\"--use-angle=swiftshader\",\"--enable-unsafe-swiftshader\",\"--disable-features=WebGPU\"]}";
+  launch_options = "{\"headless\":true,\"executablePath\":\"" + chrome + "\",\"args\":[\"--use-angle=swiftshader\",\"--enable-unsafe-swiftshader\"" + webgpu_arg + "]}";
 }
 let b = pw.launch("chromium", launch_options);
 
-let p = b.new_page("{\"viewport\":{\"width\":1600,\"height\":1100}}");
+let p = b.new_page("{\"viewport\":{\"width\":1280,\"height\":720}}");
 p.set_default_timeout(120000);
 p.set_default_navigation_timeout(120000);
-p.add_init_script("Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });");
-p.goto(viewer_base + "/?url=" + recording + "&renderer=webgl", "{\"waitUntil\":\"domcontentloaded\",\"timeout\":120000}");
+if (disable_webgpu) {
+  p.add_init_script("Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });");
+}
+p.goto(viewer_base + "/?url=" + recording + renderer_query, "{\"waitUntil\":\"domcontentloaded\",\"timeout\":120000}");
 let play = p.locator("#play");
 let slider = p.locator("#time");
 let time_label = p.locator("#time-label");
@@ -35,20 +44,20 @@ time_label.expect("toHaveText", "[\"" + min + "\",{\"timeout\":30000}]");
 $return.seek_min = time_label.text_content();
 play.click();
 play.expect("toHaveText", "[\"Pause\",{\"timeout\":30000}]");
-p.wait_for_timeout(500);
+p.wait_for_function("document.querySelector('#time-label').textContent !== '" + min + "'");
 $return.playing_time = time_label.text_content();
 play.click();
 play.expect("toHaveText", "[\"Play\",{\"timeout\":30000}]");
+p.wait_for_function("document.querySelector('#log').textContent.endsWith('\\nplay\\npause\\n')");
 $return.pause_time = time_label.text_content();
 slider.fill(max);
 time_label.expect("toHaveText", "[\"" + max + "\",{\"timeout\":30000}]");
 $return.seek_max = time_label.text_content();
-p.wait_for_timeout(2000);
 p.locator("#screenshot").click();
 log.expect("toContainText", "[\"screenshot: \",{\"timeout\":180000}]");
 p.wait_for_function("document.querySelector('#screenshot-image')?.naturalWidth > 0");
 $return.screenshot_width = p.evaluate("document.querySelector('#screenshot-image').naturalWidth");
-$return.recording_loaded = p.evaluate("performance.getEntriesByType('resource').some((entry) => entry.name === '" + recording + "')");
+$return.recording_loaded = p.evaluate("performance.getEntriesByType('resource').some((entry) => new URL(entry.name).origin === location.origin && entry.name.endsWith('/example.rrd'))");
 $return.no_hosted_recording = p.evaluate("performance.getEntriesByType('resource').every((entry) => !entry.name.startsWith('https://app.rerun.io'))");
 $return.local_viewer_wasm = p.evaluate("performance.getEntriesByType('resource').some((entry) => new URL(entry.name).origin === location.origin && entry.name.endsWith('/re_viewer_bg.wasm'))");
 $return.viewer_console = p.console_log();
@@ -96,7 +105,7 @@ check(r.get("seek_min", "") != "" && r.get("playing_time", "") != r.get("seek_mi
 check(r.get("pause_time", "") != "", "pause control", r.get("pause_time", ""));
 check(r.get("seek_max", "") != "" && r.get("seek_max", "") != r.get("seek_min", ""), "seek controls", r.get("seek_min", "") + " to " + r.get("seek_max", ""));
 check(num(r.get("screenshot_width", "0")) > 0, "viewer screenshot API", r.get("screenshot_width", ""));
-check(contains(r.get("viewer_console", ""), "WebGL") || contains(r.get("viewer_console", ""), "backend: Gl"), "viewer WebGL backend", "SwiftShader WebGL selected");
+check(contains(r.get("viewer_console", ""), "WebGL") || contains(r.get("viewer_console", ""), "WebGPU") || contains(r.get("viewer_console", ""), "backend:"), "viewer graphics backend", "default renderer selected");
 check(r.get("viewer_errors", "") == "[]", "viewer page errors", r.get("viewer_errors", ""));
 check(r.get("multiview_title", "") == "multiview", "multiview document", r.get("multiview_title", ""));
 check(r.get("multiview_canvases", 0) == 1, "multiview rendered canvas", str(r.get("multiview_canvases", 0)));
